@@ -12,9 +12,17 @@ dashscope.api_key = DASHSCOPE_API_KEY
 
 # 财经RSS源（待测试替换）
 RSS_SOURCES = {
-    "财联社": "https://rsshub.app/cls/telegraph",
-    "华尔街见闻": "https://rsshub.app/wallstreetcn/live/global",
-    "金十数据": "https://rsshub.app/jin10",
+    "华尔街见闻": "https://plink.anyfeeder.com/weixin/wallstreetcn",
+    "央视财经": "https://plink.anyfeeder.com/weixin/cctvyscj",
+    "21世纪经济报道": "https://plink.anyfeeder.com/weixin/jjbd21",
+    "界面新闻: 财经": "https://plink.anyfeeder.com/jiemian/finance",
+    "新华社新闻": "https://plink.anyfeeder.com/newscn/whxw",
+    
+    "中国日报: 财经": "https://plink.anyfeeder.com/chinadaily/caijing",
+    "科技 - 财富中文网": "https://plink.anyfeeder.com/fortunechina/keji",
+
+    
+
 }
 
 def fetch_news():
