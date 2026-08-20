@@ -4,40 +4,67 @@ import os
 import hashlib
 from datetime import datetime, timedelta
 import dashscope
+import json
 
 # 从环境变量读取配置
 FEISHU_WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
 DASHSCOPE_API_KEY = os.environ.get("DASHSCOPE_API_KEY")
 dashscope.api_key = DASHSCOPE_API_KEY
 
-# 财经RSS源（待测试替换）
+# 传统媒体 RSS 源（均已验证可用）
 RSS_SOURCES = {
     "华尔街见闻": "https://plink.anyfeeder.com/weixin/wallstreetcn",
     "央视财经": "https://plink.anyfeeder.com/weixin/cctvyscj",
     "21世纪经济报道": "https://plink.anyfeeder.com/weixin/jjbd21",
     "界面新闻: 财经": "https://plink.anyfeeder.com/jiemian/finance",
     "新华社新闻": "https://plink.anyfeeder.com/newscn/whxw",
-    
     "中国日报: 财经": "https://plink.anyfeeder.com/chinadaily/caijing",
     "科技 - 财富中文网": "https://plink.anyfeeder.com/fortunechina/keji",
-
-    
-
 }
 
-def fetch_news():
+def fetch_sina_news():
+    """从新浪财经7×24快讯API获取实时快讯"""
+    url = "https://zhibo.sina.com.cn/api/zhibo/feed?page=1&page_size=20&zhibo_id=152&tag_id=0&dire=f&dpc=1"
     news_list = []
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        # 解析路径可能随接口微调，做兼容处理
+        feed_data = data.get("result", {}).get("data", {}).get("feed_data", [])
+        for item in feed_data:
+            # 提取标题（content字段通常是文本内容）
+            title = item.get("content", "").strip()
+            if not title or len(title) < 5:
+                continue
+            # 过滤纯图片消息
+            if title.startswith("[图片]"):
+                continue
+            news_list.append({
+                "title": title,
+                "link": item.get("docurl", ""),
+                "summary": "",
+                "source": "新浪财经快讯",
+                "time": item.get("create_time", ""),
+            })
+    except Exception as e:
+        print(f"新浪快讯获取失败: {e}")
+    return news_list
+
+def fetch_news():
+    all_news = []
+    # 1. 获取传统RSS
     for source, url in RSS_SOURCES.items():
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:30]:
-                # 过滤24小时内
+            for entry in feed.entries[:20]:  # 每个源取前20条
                 pub_time = entry.get('published_parsed') or entry.get('updated_parsed')
                 if pub_time:
                     dt = datetime(*pub_time[:6])
+                    # 只保留24小时内的新闻
                     if datetime.now() - dt > timedelta(hours=24):
                         continue
-                news_list.append({
+                all_news.append({
                     "title": entry.title,
                     "link": entry.link,
                     "summary": entry.get("summary", ""),
@@ -46,25 +73,36 @@ def fetch_news():
                 })
         except Exception as e:
             print(f"抓取{source}失败: {e}")
-    # 去重
+    # 2. 获取新浪快讯
+    sina_news = fetch_sina_news()
+    all_news.extend(sina_news)
+    
+    # 去重（按标题哈希）
     seen = set()
     unique_news = []
-    for item in news_list:
+    for item in all_news:
         hash_id = hashlib.md5(item['title'].encode()).hexdigest()
         if hash_id not in seen:
             seen.add(hash_id)
-            item['hash'] = hash_id
             unique_news.append(item)
     return unique_news
 
 def filter_relevant(news_list):
+    """关键词过滤，只保留与股票/基金相关的新闻"""
     keywords = ['股市','A股','基金','央行','证监会','板块','涨停','跌停','IPO','降准','降息',
-                '美联储','汇率','新能源','半导体','消费','医药','科技','政策','数据','财报','回购','增持','港股','美股']
-    return [n for n in news_list if any(k in n['title']+n['summary'] for k in keywords)]
+                '美联储','汇率','新能源','半导体','消费','医药','科技','政策','数据','财报','回购','增持','港股','美股','证券','指数','交易','债券']
+    filtered = []
+    for n in news_list:
+        text = n['title'] + n['summary']
+        if any(k in text for k in keywords):
+            filtered.append(n)
+    return filtered
 
 def analyze_news(news_list):
+    """调用大模型生成分析报告"""
     if not news_list:
         return "今日无相关财经新闻。"
+    # 限制最多50条，避免token超限
     news_text = "\n".join([f"{i+1}. {n['title']}（来源：{n['source']}）" for i,n in enumerate(news_list[:50])])
     prompt = f"""你是一位资深财经分析师，请根据以下今日财经新闻，输出一份简洁的“今日市场要点”报告，要求：
 1. 核心事件：不超过5条，每条一句话概括。
@@ -86,9 +124,12 @@ def analyze_news(news_list):
         return f"分析失败，错误信息：{response.message}"
 
 def send_feishu(report):
+    """发送飞书消息"""
+    # 飞书text类型支持markdown，但标题需单独添加
+    content = f"📈 **今日财经日报**\n{report}"
     payload = {
         "msg_type": "text",
-        "content": {"text": report}
+        "content": {"text": content}
     }
     headers = {'Content-Type': 'application/json'}
     response = requests.post(FEISHU_WEBHOOK, json=payload, headers=headers)
