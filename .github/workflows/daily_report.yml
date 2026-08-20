@@ -1,0 +1,25 @@
+name: Daily Financial Report
+
+on:
+  schedule:
+    - cron: '30 0 * * *'   # UTC时间00:30 = 北京时间8:30
+    - cron: '0 4 * * *'     # 北京时间12:00
+    - cron: '0 12 * * *'    # 北京时间20:00
+  workflow_dispatch:        # 允许手动触发
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Run script
+        env:
+          FEISHU_WEBHOOK: ${{ secrets.FEISHU_WEBHOOK }}
+          DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+        run: python main.py
