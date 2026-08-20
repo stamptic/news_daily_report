@@ -113,7 +113,7 @@ def analyze_news(news_list):
 {news_text}
 """
     response = dashscope.Generation.call(
-        model='qwen-plus',
+        model='qwen-flash',
         prompt=prompt,
         temperature=0.3,
         max_tokens=800
