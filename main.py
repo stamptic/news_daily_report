@@ -4,7 +4,6 @@ import os
 import hashlib
 from datetime import datetime, timedelta
 import dashscope
-import json
 
 # 从环境变量读取配置
 FEISHU_WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
@@ -57,7 +56,7 @@ def fetch_news():
     for source, url in RSS_SOURCES.items():
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:20]:  # 每个源取前20条
+            for entry in feed.entries[:30]:  # 每个源取前20条
                 pub_time = entry.get('published_parsed') or entry.get('updated_parsed')
                 if pub_time:
                     dt = datetime(*pub_time[:6])
@@ -102,12 +101,17 @@ def analyze_news(news_list):
     """调用大模型生成分析报告"""
     if not news_list:
         return "今日无相关财经新闻。"
+            
+    # 获取当前日期（北京时间）
+    today_str = datetime.now().strftime('%Y年%m月%d日')
+    
     # 限制最多50条，避免token超限
     news_text = "\n".join([f"{i+1}. {n['title']}（来源：{n['source']}）" for i,n in enumerate(news_list[:50])])
-    prompt = f"""你是一位资深财经分析师，请根据以下今日财经新闻，输出一份简洁的“今日市场要点”报告，要求：
+    prompt = f"""你是一位资深财经分析师，今天是{today_str}。请根据以下今日财经新闻，输出一份简洁的“今日市场要点”报告，要求：
 1. 核心事件：不超过5条，每条一句话概括。
-2. 影响判断：标注利多/利空/中性，并说明可能影响的板块（如半导体、新能源、消费等）。
+2. 影响判断：标注利多/利空/中性，并说明可能影响的板块（如半导体、新能源、消费等）及影响原因。
 3. 重点关注：给出1-2个今日最值得关注的方向或风险提示。
+注意：不要输出报告中未提及的日期，不要使用“2025年4月5日”等虚构日期。
 
 新闻列表：
 {news_text}
@@ -123,13 +127,37 @@ def analyze_news(news_list):
     else:
         return f"分析失败，错误信息：{response.message}"
 
-def send_feishu(report):
-    """发送飞书消息"""
-    # 飞书text类型支持markdown，但标题需单独添加
-    content = f"📈 **今日财经日报**\n{report}"
+def send_feishu(report, news_list):
+    today_str = datetime.now().strftime('%Y-%m-%d')
+    # 构建富文本内容
+    post_lines = [
+        [{"tag": "text", "text": f"📈 今日财经日报（{today_str}）"}],
+        [{"tag": "text", "text": report}],
+        [{"tag": "text", "text": "\n📎 相关新闻链接"}],
+    ]
+
+    # 附加相关新闻链接（最多显示3条，避免消息过长）
+    for idx, n in enumerate(news_list[:3], 1):
+        title = n['title'].strip()
+        link = n.get('link', '')
+        if link:
+            # 使用 a 标签创建可点击链接
+            post_lines.append([
+                {"tag": "a", "text": f"{idx}. {title}", "href": link}
+            ])
+        else:
+            post_lines.append([{"tag": "text", "text": f"{idx}. {title}"}])
+    
     payload = {
-        "msg_type": "text",
-        "content": {"text": content}
+        "msg_type": "post",
+        "content": {
+            "post": {
+                "zh_cn": {
+                    "title": "今日财经日报",
+                    "content": post_lines
+                }
+            }
+        }
     }
     headers = {'Content-Type': 'application/json'}
     response = requests.post(FEISHU_WEBHOOK, json=payload, headers=headers)
@@ -142,7 +170,7 @@ def main():
     filtered = filter_relevant(news)
     print(f"过滤后剩余 {len(filtered)} 条")
     report = analyze_news(filtered)
-    send_feishu(report)
+    send_feishu(report, filtered)   # 传入新闻列表
     print("任务完成")
 
 if __name__ == "__main__":
