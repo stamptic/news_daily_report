@@ -56,16 +56,20 @@ def fetch_news():
     for source, url in RSS_SOURCES.items():
         try:
             feed = feedparser.parse(url)
-            for entry in feed.entries[:30]:  # 每个源取前20条
+            for entry in feed.entries[:20]:  # 每个源取前20条
                 pub_time = entry.get('published_parsed') or entry.get('updated_parsed')
                 if pub_time:
                     dt = datetime(*pub_time[:6])
                     # 只保留24小时内的新闻
                     if datetime.now() - dt > timedelta(hours=24):
                         continue
+                # 提取链接并过滤搜狗微信链接
+                original_link = extract_original_link(entry)
+                if original_link and 'weixin.sogou.com' in original_link:
+                    original_link = ''
                 all_news.append({
                     "title": entry.title,
-                    "link": entry.link,
+                    "link": original_link,
                     "summary": entry.get("summary", ""),
                     "source": source,
                     "time": entry.get("published", entry.get("updated", "")),
@@ -128,36 +132,26 @@ def analyze_news(news_list):
         return f"分析失败，错误信息：{response.message}"
 
 def send_feishu(report, news_list):
-    today_str = datetime.now().strftime('%Y-%m-%d')
-    # 构建富文本内容
-    post_lines = [
-        [{"tag": "text", "text": f"📈 今日财经日报（{today_str}）"}],
-        [{"tag": "text", "text": report}],
-        [{"tag": "text", "text": "\n📎 相关新闻链接"}],
-    ]
 
-    # 附加相关新闻链接（最多显示3条，避免消息过长）
-    for idx, n in enumerate(news_list[:3], 1):
-        title = n['title'].strip()
-        link = n.get('link', '')
-        if link:
-            # 使用 a 标签创建可点击链接
-            post_lines.append([
-                {"tag": "a", "text": f"{idx}. {title}", "href": link}
-            ])
-        else:
-            post_lines.append([{"tag": "text", "text": f"{idx}. {title}"}])
+    content = f"📈 **今日财经日报**\n{report}"
+    
+    # 附加相关新闻列表（最多显示10条，可调整）
+    if news_list:
+        content += "\n\n📎 **相关新闻列表**\n"
+        for idx, n in enumerate(news_list[:10], 1):
+            title = n['title'].strip()
+            source = n['source']
+            link = n.get('link', '')
+            if link and 'weixin.sogou.com' not in link:
+                # 有有效链接，显示为标题和链接（飞书会自动识别URL）
+                content += f"{idx}. [{source}] {title} - {link}\n"
+            else:
+                # 无有效链接，只显示标题和来源，方便搜索
+                content += f"{idx}. [{source}] {title}\n"
     
     payload = {
-        "msg_type": "post",
-        "content": {
-            "post": {
-                "zh_cn": {
-                    "title": "今日财经日报",
-                    "content": post_lines
-                }
-            }
-        }
+        "msg_type": "text",
+        "content": {"text": content}
     }
     headers = {'Content-Type': 'application/json'}
     response = requests.post(FEISHU_WEBHOOK, json=payload, headers=headers)
