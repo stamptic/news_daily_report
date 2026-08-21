@@ -64,7 +64,7 @@ def fetch_news():
                     if datetime.now() - dt > timedelta(hours=24):
                         continue
                 # 提取链接并过滤搜狗微信链接
-                original_link = extract_original_link(entry)
+                original_link = entry.get('link', '')
                 if original_link and 'weixin.sogou.com' in original_link:
                     original_link = ''
                 all_news.append({
