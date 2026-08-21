@@ -2,10 +2,10 @@ name: Daily Financial Report
 
 on:
   schedule:
-    - cron: '30 0 * * *'   # UTC时间00:30 = 北京时间8:30
-    - cron: '0 4 * * *'     # 北京时间12:00
-    - cron: '0 12 * * *'    # 北京时间20:00
-  workflow_dispatch:        # 允许手动触发
+    - cron: '30 0 * * *'   # UTC 00:30 = 北京时间 08:30
+    - cron: '0 4 * * *'    # UTC 04:00 = 北京时间 12:00
+    - cron: '0 12 * * *'   # UTC 12:00 = 北京时间 20:00
+  workflow_dispatch:
 
 jobs:
   run:
