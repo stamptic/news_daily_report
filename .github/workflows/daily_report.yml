@@ -2,10 +2,9 @@ name: Daily Financial Report
 
 on:
   schedule:
-    - cron: '30 8 * * 1-5'   # 北京时间 08:30
-    - cron: '0 12 * * 1-5'    # 北京时间 12:00
-    - cron: '0 20 * * *'   #  北京时间 20:00
-      timezone: 'Asia/Shanghai'
+    - cron: '30 7 * * *'   # 北京时间 08:30
+    - cron: '0 12 * * *'    # 北京时间 12:00
+    - cron: '0 19 * * *'   #  北京时间 20:00
   workflow_dispatch:
 
 jobs:
