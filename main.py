@@ -4,6 +4,7 @@ import os
 import hashlib
 from datetime import datetime, timedelta
 import dashscope
+from dashscope import MultiModalConversation  # 使用多模态模型
 
 # 从环境变量读取配置
 FEISHU_WEBHOOK = os.environ.get("FEISHU_WEBHOOK")
@@ -120,15 +121,31 @@ def analyze_news(news_list):
 新闻列表：
 {news_text}
 """
-    response = dashscope.Generation.call(
+
+    # 多模态调用需要使用 messages 格式
+    messages = [{
+        "role": "user",
+        "content": [{"text": prompt}]
+    }]
+
+    response = MultiModalConversation.call(   # 文本模型使用dashscope.Generation.call
         model='qwen3.7-plus-2026-05-26',
-        prompt=prompt,
+        messages=messages,    # 文本模型改为prompt=prompt
         temperature=0.3,
         max_tokens=800
     )
+
     if response.status_code == 200:
-        return response.output.text
-        # 如果模型返回空或None，返回默认提示
+        # 多模态返回可能包含 content 列表，需要提取文本
+        content = response.output.choices[0].message.content
+        
+        if isinstance(content, list):
+            # 提取所有 text 字段
+            text_parts = [item.get('text', '') for item in content if 'text' in item]
+            result = ''.join(text_parts)
+        else:
+            result = content
+        # 多模态模型使用此处结束，如切换回文本模型从上一个注释开始到此全部删除即可
         if not result or result.strip() == "None":
             return "模型未能生成有效分析，请稍后重试。"
         return result
