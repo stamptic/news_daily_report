@@ -121,7 +121,7 @@ def analyze_news(news_list):
 {news_text}
 """
     response = dashscope.Generation.call(
-        model='deepseek-v4-pro-0813',
+        model='qwen3.7-plus-2026-05-26',
         prompt=prompt,
         temperature=0.3,
         max_tokens=800
