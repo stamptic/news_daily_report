@@ -128,6 +128,10 @@ def analyze_news(news_list):
     )
     if response.status_code == 200:
         return response.output.text
+        # 如果模型返回空或None，返回默认提示
+        if not result or result.strip() == "None":
+            return "模型未能生成有效分析，请稍后重试。"
+        return result
     else:
         return f"分析失败，错误信息：{response.message}"
 
@@ -164,6 +168,7 @@ def main():
     filtered = filter_relevant(news)
     print(f"过滤后剩余 {len(filtered)} 条")
     report = analyze_news(filtered)
+    print(f"报告内容：{report}")
     send_feishu(report, filtered)   # 传入新闻列表
     print("任务完成")
 
