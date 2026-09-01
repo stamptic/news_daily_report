@@ -139,7 +139,7 @@ def analyze_news(news_list):
     }]
 
     response = MultiModalConversation.call(   # 文本模型使用dashscope.Generation.call
-        model='qwen3.7-plus-2026-05-26',
+        model='qwen3.7-max-2026-06-08',
         messages=messages,    # 文本模型改为prompt=prompt
         temperature=0.3,
         max_tokens=1500
