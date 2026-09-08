@@ -120,6 +120,7 @@ def analyze_news(news_list):
    - 事件概述：用1-2句话说明发生了什么。
    - 影响分析：解释该事件对市场、板块或行业的影响逻辑，明确利多/利空方向及影响强度，并用通俗的语言说明原因（避免使用过于专业的术语，让普通投资者也能理解）。
    - 投资启示：给出针对该事件的操作思路或关注方向（如关注哪些板块、指标或风险点），不构成具体投资建议。
+   - 名词解释：给出关键1-2个名词的通俗解释，帮助理解分析逻辑。
 3. 所有事件分析完成后，输出一个简短的“综合策略建议”，包括当前市场的主要风险和总体仓位/节奏思路。
 
 【重要约束】
@@ -139,7 +140,7 @@ def analyze_news(news_list):
     }]
 
     response = MultiModalConversation.call(   # 文本模型使用dashscope.Generation.call
-        model='qwen3.7-max-2026-06-08',
+        model='qwen3.8-max',
         messages=messages,    # 文本模型改为prompt=prompt
         temperature=0.3,
         max_tokens=1500
